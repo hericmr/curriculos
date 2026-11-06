@@ -111,8 +111,8 @@ input[type=search], select { width: 100%; min-width: 0; padding: 8px 10px; borde
 <body>
 <div id="entrar" hidden><form id="formLogin">
   <h1>Entrega de currículos</h1>
-  <p>Entre com o e-mail e a senha cadastrados.</p>
-  <input id="email" type="email" autocomplete="username" placeholder="E-mail" required>
+  <p>Entre com seu usuário e senha.</p>
+  <input id="email" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Usuário" required>
   <input id="senha" type="password" autocomplete="current-password" placeholder="Senha" required>
   <button class="btn pri" type="submit">Entrar</button>
   <div id="erroLogin" role="alert"></div>
@@ -372,7 +372,7 @@ async function carregar(sessao) {
     for (const b of bairros) donos[b.bid] = b;
     for (const q of equipe) nomes[q.email] = { nome: q.email === eu ? 'você' : q.nome, cor: q.email === eu ? cor('--acento') : cor('--volta') };
     const meu = equipe.find(q => q.email === eu);
-    $('quem').textContent = meu ? `Você: ${meu.nome}` : eu;
+    $('quem').textContent = meu ? `Você: ${meu.nome}` : eu.replace('@curriculos.local', '');
     carregado = true;
     montar(); montarCidades(); render();
     db.channel('entregas-ao-vivo')
@@ -384,15 +384,18 @@ async function carregar(sessao) {
   } catch (e) {
     $('progTxt').textContent = '';
     const a = $('estado'); a.hidden = false;
-    a.textContent = 'Esta conta não tem acesso à lista. Confira se o e-mail foi cadastrado como entregador.';
+    a.textContent = 'Esta conta não tem acesso à lista. Confira se o usuário foi cadastrado como entregador.';
   }
 }
 
 $('formLogin').onsubmit = async ev => {
   ev.preventDefault();
   $('erroLogin').textContent = '';
-  const { error } = await db.auth.signInWithPassword({ email: $('email').value.trim(), password: $('senha').value });
-  if (error) $('erroLogin').textContent = 'E-mail ou senha incorretos.';
+  // o Supabase exige e-mail: o usuário vira usuario@curriculos.local, um endereço que nunca recebe mensagens
+  const usuario = $('email').value.trim().toLowerCase();
+  const email = usuario.includes('@') ? usuario : usuario + '@curriculos.local';
+  const { error } = await db.auth.signInWithPassword({ email, password: $('senha').value });
+  if (error) $('erroLogin').textContent = 'Usuário ou senha incorretos.';
 };
 $('sair').onclick = async () => { await db.auth.signOut(); location.reload(); };
 db.auth.onAuthStateChange((_ev, sessao) => { if (sessao) carregar(sessao); else $('entrar').hidden = false; });

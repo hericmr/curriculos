@@ -10,10 +10,10 @@ App de celular para Heric e Giovanna dividirem bairros e marcarem a entrega dos 
 
 1. Crie um projeto em <https://supabase.com> (plano gratuito).
 2. **SQL Editor** → cole e rode `supabase/01_estrutura.sql`.
-3. Edite `dados-privados/02_entregadores.sql` com os e-mails reais dos dois e rode no SQL Editor.
+3. Rode `dados-privados/02_entregadores.sql` (usuários `heric_moura` e `giovanna_pagani`).
 4. Rode, um de cada vez, `dados-privados/03_pessoas_parte1.sql` a `parte4.sql`.
 5. **Authentication → Sign In / Providers**: desligue **Allow new users to sign up**.
-6. **Authentication → Users → Add user → Create new user**: crie Heric e Giovanna com os mesmos e-mails do passo 3 e uma senha para cada (marque *Auto Confirm User*).
+6. **Authentication → Users → Add user → Create new user**: crie `heric_moura@curriculos.local` e `giovanna_pagani@curriculos.local` com uma senha para cada (marque *Auto Confirm User*).
 7. **Project Settings → API**: copie a *Project URL* e a chave *anon public* para `config.js`.
 
 ## Publicar no GitHub Pages
@@ -24,4 +24,4 @@ git push origin main
 
 No repositório: **Settings → Pages → Deploy from a branch → main / (root)**.
 
-No celular: abra o link, entre com e-mail e senha e use **Adicionar à tela inicial** para abrir como app.
+No celular: abra o link, entre com o usuário (sem o @curriculos.local) e a senha e use **Adicionar à tela inicial** para abrir como app.
