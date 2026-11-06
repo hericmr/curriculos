@@ -411,7 +411,8 @@ async function carregar(sessao) {
   } catch (e) {
     $('progTxt').textContent = '';
     const a = $('estado'); a.hidden = false;
-    a.textContent = 'Esta conta não tem acesso à lista. Confira se o usuário foi cadastrado como entregador.';
+    a.textContent = `A conta ${eu} entrou, mas a lista não abriu (${e?.message === 'sem acesso' ? 'lista vazia para esta conta' : e?.message || e?.code || 'erro desconhecido'}). Confira se ela está cadastrada como entregadora.`;
+    if ($('painel').classList.contains('recolhido')) $('alternar').click();
   }
 }
 
