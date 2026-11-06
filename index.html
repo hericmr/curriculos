@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b6e69">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone.svg">
+<title>Entrega de Currículos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Layout: mapa ocupa a tela; painel de bairros/pessoa como folha inferior no celular e coluna lateral no desktop */
+:root {
+  --bg: #f3f5f4; --sup: #ffffff; --fg: #17211f; --suave: #5d6b68; --borda: #d7dedc;
+  --terra: #eef1ec; --rua: #ffffff; --via: #f6d58e; --acento: #0b6e69;
+  --pend: #d4471f; --aprox: #e09a24; --ok: #2f8f46; --volta: #3f6fd8; --nao: #8a8f8d;
+  --filtro-mapa: none;
+  --fonte: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111816; --sup: #18211f; --fg: #e5ece9; --suave: #9aa8a4; --borda: #2a3532;
+  --terra: #141c1a; --rua: #2e3a37; --via: #5b5236; --acento: #4cc2b8;
+  --pend: #ff6e45; --aprox: #f2b84b; --ok: #58c271; --volta: #7ea2ff; --nao: #8d9592; color-scheme: dark;
+  --filtro-mapa: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); } }
+:root[data-theme="dark"] {
+  --bg: #111816; --sup: #18211f; --fg: #e5ece9; --suave: #9aa8a4; --borda: #2a3532;
+  --terra: #141c1a; --rua: #2e3a37; --via: #5b5236; --acento: #4cc2b8;
+  --pend: #ff6e45; --aprox: #f2b84b; --ok: #58c271; --volta: #7ea2ff; --nao: #8d9592; color-scheme: dark;
+  --filtro-mapa: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 var(--fonte); overflow: hidden; padding-top: env(safe-area-inset-top, 0px); }
+[hidden] { display: none !important; }
+#entrar { position: fixed; inset: 0; z-index: 2000; background: var(--bg); display: grid; place-items: center; padding: 16px; }
+#entrar form { width: min(360px, 100%); background: var(--sup); border: 1px solid var(--borda); border-radius: 14px; padding: 22px 20px; display: grid; gap: 12px; }
+#entrar h1 { font-size: 20px; }
+#entrar p { margin: 0; color: var(--suave); font-size: 14px; }
+#entrar input { width: 100%; padding: 11px 12px; border: 1px solid var(--borda); border-radius: 8px; background: var(--bg); font-size: 16px; }
+#entrar .btn { padding: 11px; font-size: 16px; }
+#erroLogin { color: var(--pend); font-size: 14px; min-height: 1em; }
+.leaflet-tile-pane { filter: var(--filtro-mapa); }
+* { box-sizing: border-box; }
+button, input, select { font: inherit; color: inherit; }
+#app { display: grid; grid-template-columns: 360px 1fr; height: 100%; }
+#painel { background: var(--sup); border-right: 1px solid var(--borda); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+#mapa { background: var(--terra); min-height: 0; }
+.leaflet-container { background: var(--terra); font: inherit; }
+.topo { padding-block: 12px 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: 16px; border-bottom: 1px solid var(--borda); display: grid; gap: 8px; }
+.linha { display: flex; gap: 8px; align-items: center; min-width: 0; }
+h1 { font-size: 17px; margin: 0; flex: 1; text-wrap: balance; }
+.quem { font-size: 12px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
+.prog { font-size: 13px; color: var(--suave); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.barra { height: 6px; border-radius: 3px; background: var(--borda); overflow: hidden; display: flex; }
+.barra i { display: block; height: 100%; }
+.filtros { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+input[type=search], select { width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; background: var(--bg); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--borda); background: var(--bg); border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--acento); border-color: var(--acento); color: var(--sup); }
+#corpo { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+#lista { overflow: auto; flex: 1; min-height: 0; }
+.bairro { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 16px; border-bottom: 1px solid var(--borda); cursor: pointer; }
+.bairro:hover { background: var(--bg); }
+.bairro .nome { font-weight: 600; min-width: 0; }
+.bairro .cid { font-size: 12px; color: var(--suave); }
+.bairro .num { font-variant-numeric: tabular-nums; color: var(--suave); text-align: right; font-size: 13px; }
+.dono { font-size: 12px; display: inline-flex; gap: 4px; align-items: center; color: var(--suave); }
+.dono b { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.cab { padding: 10px 16px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--borda); position: sticky; top: 0; background: var(--sup); z-index: 1; flex-wrap: wrap; }
+.cab h2 { font-size: 15px; margin: 0; flex: 1; min-width: 0; }
+.btn { border: 1px solid var(--borda); background: var(--bg); border-radius: 8px; padding: 7px 11px; cursor: pointer; font-size: 14px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.pri { background: var(--acento); border-color: var(--acento); color: var(--sup); font-weight: 600; }
+.btn:focus-visible, .chip:focus-visible, .pessoa:focus-visible, .bairro:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.pessoa { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; padding: 9px 16px; border-bottom: 1px solid var(--borda); cursor: pointer; align-items: start; }
+.pessoa .ord { font-variant-numeric: tabular-nums; color: var(--suave); font-size: 13px; padding-top: 1px; }
+.pessoa .end { font-size: 13px; color: var(--suave); }
+.pessoa.feito .nm { text-decoration: line-through; color: var(--suave); }
+.st { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; }
+#ficha { position: fixed; z-index: 1000; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(380px, calc(100% - 32px)); background: var(--sup); border: 1px solid var(--borda); border-radius: 12px; box-shadow: 0 10px 30px rgb(0 0 0 / .18); padding: 14px 16px; display: grid; gap: 8px; }
+#ficha h3 { margin: 0; font-size: 17px; padding-right: 30px; }
+#ficha .end { color: var(--suave); }
+#ficha .meta { font-size: 12px; color: var(--suave); }
+#ficha .acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+#ficha .acoes .btn { padding: 10px 8px; }
+#ficha .acoes .btn[data-s="entregue"] { grid-column: 1 / -1; }
+#ficha .acoes .btn[aria-pressed="true"] { outline: 2px solid var(--acento); }
+#ficha .fechar { position: absolute; top: 8px; right: 8px; border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--suave); padding: 4px 8px; }
+#ficha a.ir { text-align: center; text-decoration: none; color: var(--acento); font-weight: 600; padding: 6px; }
+.aviso { padding: 10px 16px; font-size: 13px; background: var(--bg); border-bottom: 1px solid var(--borda); color: var(--suave); }
+.nomerua { color: var(--suave); font-size: 11px; white-space: nowrap; text-shadow: 0 0 3px var(--terra), 0 0 3px var(--terra), 0 0 2px var(--terra); pointer-events: none; transform: translate(-50%, -50%); }
+.leaflet-control-attribution { background: var(--sup) !important; color: var(--suave) !important; font-size: 10px; }
+.rotulo { color: var(--suave); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 0 3px var(--terra), 0 0 3px var(--terra); pointer-events: none; }
+.leg { background: var(--sup); color: var(--fg); border: 1px solid var(--borda); border-radius: 8px; padding: 6px 9px; font-size: 12px; display: grid; gap: 2px; }
+.leg span { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+.leaflet-control-zoom a { background: var(--sup) !important; color: var(--fg) !important; border-color: var(--borda) !important; }
+#alternar { display: none; }
+@media (max-width: 760px) {
+  #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  #painel { border-right: 0; border-bottom: 1px solid var(--borda); max-height: 45vh; }
+  #painel.recolhido #corpo { display: none; }
+  #alternar { display: inline-block; }
+  #ficha { left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); width: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: no-preference) { .btn, .chip { transition: background .15s; } }
+</style>
+</head>
+<body>
+<div id="entrar" hidden><form id="formLogin">
+  <h1>Entrega de currículos</h1>
+  <p>Entre com o e-mail e a senha cadastrados.</p>
+  <input id="email" type="email" autocomplete="username" placeholder="E-mail" required>
+  <input id="senha" type="password" autocomplete="current-password" placeholder="Senha" required>
+  <button class="btn pri" type="submit">Entrar</button>
+  <div id="erroLogin" role="alert"></div>
+</form></div>
+<div id="app">
+  <aside id="painel">
+    <div class="topo">
+      <div class="linha"><h1>Entrega de currículos</h1><span class="quem" id="quem"></span><button class="btn" id="sair" hidden>Sair</button>
+        <button class="btn" id="alternar" aria-expanded="true" aria-controls="corpo">Lista</button></div>
+      <div class="prog"><span id="progTxt">Carregando…</span><span id="progSub"></span></div>
+      <div class="barra" aria-hidden="true"><i id="bOk" style="background:var(--ok)"></i><i id="bVolta" style="background:var(--volta)"></i><i id="bNao" style="background:var(--nao)"></i></div>
+    </div>
+    <div id="corpo">
+      <div class="topo" style="border-top:0">
+        <div class="filtros"><input id="busca" type="search" placeholder="Buscar nome, rua ou bairro" aria-label="Buscar"><select id="cidade" aria-label="Cidade"></select></div>
+        <div class="chips">
+          <button class="chip" id="fPend" aria-pressed="false">Só pendentes</button>
+          <button class="chip" id="fMeus" aria-pressed="false">Meus bairros</button>
+          <button class="chip" id="fLivres" aria-pressed="false">Bairros livres</button>
+        </div>
+      </div>
+      <div id="estado" class="aviso" hidden></div>
+      <div id="lista"></div>
+    </div>
+  </aside>
+  <div id="mapa" aria-label="Mapa das entregas"></div>
+</div>
+<div id="ficha" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+let P = [];
+const STATUS = {
+  entregue: { rot: 'Entregue', cor: '--ok' },
+  voltar: { rot: 'Ninguém em casa', cor: '--volta' },
+  nao: { rot: 'Não entregar', cor: '--nao' },
+};
+let porId = new Map();
+const marcas = {};      // entregas/{id} -> {status, por, em}
+const donos = {};       // bairros/{id} -> {responsavel}
+let eu = null, db = null, podeEscrever = true, nomes = {};
+let bairroAberto = null, pessoaAberta = null;
+const filtro = { pend: false, meus: false, livres: false };
+const $ = id => document.getElementById(id);
+const cor = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+
+// mapa sem imagens externas: ruas desenhadas a partir do cadastro de endereços do IBGE
+const mapa = L.map('mapa', { preferCanvas: true, zoomControl: true, attributionControl: true }).setView([-23.965, -46.335], 13);
+const tela = L.canvas({ padding: 0.3 });
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19,
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">colaboradores do OpenStreetMap</a>' }).addTo(mapa);
+mapa.attributionControl.setPrefix(false);
+
+const pontos = L.layerGroup().addTo(mapa);
+const rotulos = L.layerGroup();
+const marcadores = new Map();
+function corDe(p) {
+  const m = marcas[p.id];
+  if (m && STATUS[m.status]) return cor(STATUS[m.status].cor);
+  return p.prec.startsWith('número') ? cor('--pend') : cor('--aprox');
+}
+function montar() {
+for (const p of P) {
+  if (p.lat == null) continue;
+  const m = L.circleMarker([p.lat, p.lng], { renderer: tela, radius: 7, weight: 1.5, color: cor('--sup'), fillColor: corDe(p), fillOpacity: 1 });
+  m.on('click', () => abrirPessoa(p.id));
+  m.addTo(pontos); marcadores.set(p.id, m);
+}
+// nomes dos bairros no centro de seus pontos
+const centros = {};
+for (const p of P) if (p.lat != null) { const c = centros[p.bid] ||= { n: 0, la: 0, lo: 0, nome: p.bairro }; c.n++; c.la += p.lat; c.lo += p.lng; }
+for (const k in centros) { const c = centros[k]; L.marker([c.la / c.n, c.lo / c.n], { icon: L.divIcon({ className: 'rotulo', html: '', iconSize: null }), interactive: false, keyboard: false })
+  .on('add', e => { e.target.getElement().textContent = c.nome; }).addTo(rotulos); }
+}
+mapa.on('zoomend', () => mapa.getZoom() >= 14 ? rotulos.addTo(mapa) : rotulos.remove());
+rotulos.addTo(mapa);
+
+const leg = L.control({ position: 'bottomleft' });
+leg.onAdd = () => { const d = L.DomUtil.create('div', 'leg');
+  [['--pend', 'Pendente'], ['--aprox', 'Pendente, posição pela rua'], ['--ok', 'Entregue'], ['--volta', 'Ninguém em casa'], ['--nao', 'Não entregar']]
+    .forEach(([c, t]) => { const r = el('div'); const s = el('span'); s.style.background = cor(c); r.append(s, t); d.append(r); });
+  return d; };
+leg.addTo(mapa);
+
+function visiveis() {
+  const t = $('busca').value.trim().toLowerCase();
+  const cid = $('cidade').value;
+  return P.filter(p => (!cid || p.cidade === cid)
+    && (!filtro.pend || !marcas[p.id] || marcas[p.id].status === 'voltar')
+    && (!filtro.meus || (eu && donos[p.bid]?.responsavel === eu))
+    && (!filtro.livres || !donos[p.bid]?.responsavel)
+    && (!t || (p.nome + ' ' + p.end + ' ' + p.bairro).toLowerCase().includes(t)));
+}
+
+async function resolverNomes() {}
+
+function progresso() {
+  const tot = P.length, c = { entregue: 0, voltar: 0, nao: 0 };
+  for (const id in marcas) if (porId.has(id) && c[marcas[id].status] != null) c[marcas[id].status]++;
+  $('progTxt').textContent = `${c.entregue} de ${tot} entregues`;
+  $('progSub').textContent = `${c.voltar} para voltar · ${c.nao} não entregar`;
+  $('bOk').style.width = (100 * c.entregue / tot) + '%';
+  $('bVolta').style.width = (100 * c.voltar / tot) + '%';
+  $('bNao').style.width = (100 * c.nao / tot) + '%';
+}
+
+function donoEl(bid) {
+  const d = donos[bid]?.responsavel;
+  const s = el('span', 'dono');
+  if (!d) { s.textContent = 'livre'; return s; }
+  const b = el('b'); b.style.background = nomes[d]?.cor || cor('--acento');
+  s.append(b, nomes[d]?.nome || '…');
+  return s;
+}
+
+function render() {
+  progresso();
+  for (const p of P) { const m = marcadores.get(p.id); if (m) m.setStyle({ fillColor: corDe(p) }); }
+  const vs = visiveis(), ids = new Set(vs.map(p => p.id));
+  for (const [id, m] of marcadores) { const dentro = ids.has(id) && (!bairroAberto || porId.get(id).bid === bairroAberto); if (dentro && !pontos.hasLayer(m)) pontos.addLayer(m); else if (!dentro && pontos.hasLayer(m)) pontos.removeLayer(m); }
+  const lista = $('lista'); lista.replaceChildren();
+  if (bairroAberto) {
+    const doB = vs.filter(p => p.bid === bairroAberto).sort((a, b) => a.ordem - b.ordem);
+    const ex = P.find(p => p.bid === bairroAberto);
+    const cab = el('div', 'cab');
+    const volta = el('button', 'btn', '← Bairros'); volta.onclick = () => { bairroAberto = null; render(); };
+    const h = el('h2', null, `${ex.bairro} · ${ex.cidade}`);
+    const meu = donos[bairroAberto]?.responsavel === eu;
+    const assumir = el('button', 'btn' + (meu ? '' : ' pri'), meu ? 'Largar bairro' : 'Assumir bairro');
+    assumir.disabled = !podeEscrever || !db || !eu;
+    assumir.onclick = () => definirDono(bairroAberto, meu ? null : eu);
+    cab.append(volta, h, donoEl(bairroAberto), assumir);
+    lista.append(cab);
+    for (const p of doB) lista.append(linhaPessoa(p));
+    if (!doB.length) lista.append(el('div', 'aviso', 'Ninguém neste bairro com os filtros atuais.'));
+    return;
+  }
+  const g = {};
+  for (const p of vs) { const b = g[p.bid] ||= { p, n: 0, ok: 0 }; b.n++; if (marcas[p.id]) b.ok++; }
+  const ordem = Object.entries(g).sort((a, b) => (b[1].n - b[1].ok) - (a[1].n - a[1].ok));
+  for (const [bid, b] of ordem) {
+    const d = el('div', 'bairro'); d.tabIndex = 0; d.setAttribute('role', 'button');
+    const esq = el('div'); esq.append(el('div', 'nome', b.p.bairro), el('div', 'cid', b.p.cidade));
+    const dir = el('div'); dir.append(el('div', 'num', `${b.ok}/${b.n}`), donoEl(bid));
+    d.append(esq, dir);
+    d.onclick = d.onkeydown = e => { if (e.type === 'keydown' && e.key !== 'Enter') return; abrirBairro(bid); };
+    lista.append(d);
+  }
+  if (!ordem.length) lista.append(el('div', 'aviso', 'Nenhum bairro com os filtros atuais.'));
+  if (pessoaAberta) abrirPessoa(pessoaAberta, false);
+}
+
+function linhaPessoa(p) {
+  const m = marcas[p.id];
+  const d = el('div', 'pessoa' + (m && m.status !== 'voltar' ? ' feito' : '')); d.tabIndex = 0;
+  const meio = el('div'); meio.append(el('div', 'nm', p.nome), el('div', 'end', p.end + (p.lat == null ? ' · sem posição no mapa' : '')));
+  const st = el('span', 'st'); st.style.background = corDe(p);
+  d.append(el('span', 'ord', p.ordem), meio, st);
+  d.onclick = d.onkeydown = e => { if (e.type === 'keydown' && e.key !== 'Enter') return; abrirPessoa(p.id); };
+  return d;
+}
+
+function abrirBairro(bid) {
+  bairroAberto = bid; render();
+  const ms = P.filter(p => p.bid === bid && p.lat != null).map(p => [p.lat, p.lng]);
+  if (ms.length) mapa.fitBounds(L.latLngBounds(ms).pad(0.15), { maxZoom: 17 });
+  $('lista').scrollTop = 0;
+}
+
+function abrirPessoa(id, centrar = true) {
+  const p = porId.get(id); pessoaAberta = id;
+  const m = marcas[id];
+  const f = $('ficha'); f.replaceChildren(); f.hidden = false;
+  const x = el('button', 'fechar', '×'); x.setAttribute('aria-label', 'Fechar'); x.onclick = () => { f.hidden = true; pessoaAberta = null; };
+  f.append(x, el('h3', null, p.nome), el('div', 'end', `${p.end} — ${p.bairro}, ${p.cidade} · CEP ${p.cep}`));
+  const meta = el('div', 'meta', `Parada ${p.ordem} do bairro · posição: ${p.prec}` + (p.obs ? ` · ${p.obs}` : ''));
+  f.append(meta);
+  if (m) { const q = el('div', 'meta'); q.textContent = `${STATUS[m.status]?.rot || m.status} por ${nomes[m.por]?.nome || '…'} em ${new Date(m.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`; f.append(q); }
+  const ac = el('div', 'acoes');
+  for (const s of ['entregue', 'voltar', 'nao']) {
+    const b = el('button', 'btn' + (s === 'entregue' ? ' pri' : ''), STATUS[s].rot);
+    b.dataset.s = s; b.setAttribute('aria-pressed', m?.status === s ? 'true' : 'false');
+    b.disabled = !podeEscrever || !db;
+    b.onclick = () => marcar(id, m?.status === s ? null : s);
+    ac.append(b);
+  }
+  f.append(ac);
+  const ir = el('a', 'ir', 'Abrir rota no Google Maps ↗');
+  ir.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(`${p.end}, ${p.bairro}, ${p.cidade} - SP, ${p.cep}`);
+  ir.target = '_blank'; ir.rel = 'noopener';
+  f.append(ir);
+  if (centrar && matchMedia('(max-width: 760px)').matches && !$('painel').classList.contains('recolhido')) $('alternar').click();
+  if (centrar && p.lat != null) setTimeout(() => mapa.setView([p.lat, p.lng], Math.max(mapa.getZoom(), 16)), 80);
+}
+
+async function marcar(id, status) {
+  const antes = marcas[id];
+  if (status) marcas[id] = { status, por: eu, em: new Date().toISOString() }; else delete marcas[id];
+  render(); abrirPessoa(id, false);
+  const { error } = status
+    ? await db.from('entregas').upsert({ pessoa_id: id, status, por: eu, em: new Date().toISOString() })
+    : await db.from('entregas').delete().eq('pessoa_id', id);
+  if (error) { if (antes) marcas[id] = antes; else delete marcas[id]; aviso(error); render(); }
+}
+
+async function definirDono(bid, quem) {
+  const { error } = quem
+    ? await db.from('bairros').upsert({ bid, responsavel: quem })
+    : await db.from('bairros').delete().eq('bid', bid);
+  if (error) aviso(error); else { if (quem) donos[bid] = { responsavel: quem }; else delete donos[bid]; render(); }
+}
+
+function aviso(e) {
+  const a = $('estado'); a.hidden = false;
+  a.textContent = 'Não foi possível salvar agora. Confira a conexão e toque de novo.';
+}
+
+// filtros
+function montarCidades() {
+const cids = [...new Set(P.map(p => p.cidade))].sort((a, b) => P.filter(p => p.cidade === b).length - P.filter(p => p.cidade === a).length);
+$('cidade').replaceChildren(new Option('Todas as cidades', ''), ...cids.map(c => new Option(c, c)));
+}
+$('busca').oninput = () => render();
+$('cidade').onchange = () => { bairroAberto = null; render(); };
+for (const [btn, k] of [['fPend', 'pend'], ['fMeus', 'meus'], ['fLivres', 'livres']])
+  $(btn).onclick = () => { filtro[k] = !filtro[k]; $(btn).setAttribute('aria-pressed', filtro[k]); render(); };
+$('alternar').onclick = () => { const p = $('painel'); p.classList.toggle('recolhido'); $('alternar').setAttribute('aria-expanded', !p.classList.contains('recolhido')); setTimeout(() => mapa.invalidateSize(), 50); };
+
+// login e dados compartilhados (Supabase)
+db = supabase.createClient(window.CONFIG.supabaseUrl, window.CONFIG.supabaseAnonKey);
+let carregado = false;
+
+async function tudo(tabela) {
+  const linhas = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await db.from(tabela).select('*').range(de, de + 999);
+    if (error) throw error;
+    linhas.push(...data);
+    if (data.length < 1000) return linhas;
+  }
+}
+
+async function carregar(sessao) {
+  eu = sessao.user.email;
+  $('entrar').hidden = true; $('sair').hidden = false;
+  if (carregado) return;
+  $('progTxt').textContent = 'Carregando a lista…';
+  try {
+    const [pessoas, entregas, bairros, equipe] = await Promise.all(['pessoas', 'entregas', 'bairros', 'entregadores'].map(tudo));
+    if (!pessoas.length) throw { message: 'sem acesso' };
+    P = pessoas.map(p => ({ ...p, end: p.ende })).sort((a, b) => a.bid.localeCompare(b.bid) || a.ordem - b.ordem);
+    porId = new Map(P.map(p => [p.id, p]));
+    for (const e of entregas) marcas[e.pessoa_id] = e;
+    for (const b of bairros) donos[b.bid] = b;
+    for (const q of equipe) nomes[q.email] = { nome: q.email === eu ? 'você' : q.nome, cor: q.email === eu ? cor('--acento') : cor('--volta') };
+    const meu = equipe.find(q => q.email === eu);
+    $('quem').textContent = meu ? `Você: ${meu.nome}` : eu;
+    carregado = true;
+    montar(); montarCidades(); render();
+    db.channel('entregas-ao-vivo')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas' }, ({ eventType, new: n, old: o }) => {
+        if (eventType === 'DELETE') delete marcas[o.pessoa_id]; else marcas[n.pessoa_id] = n; render(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bairros' }, ({ eventType, new: n, old: o }) => {
+        if (eventType === 'DELETE') delete donos[o.bid]; else donos[n.bid] = n; render(); })
+      .subscribe();
+  } catch (e) {
+    $('progTxt').textContent = '';
+    const a = $('estado'); a.hidden = false;
+    a.textContent = 'Esta conta não tem acesso à lista. Confira se o e-mail foi cadastrado como entregador.';
+  }
+}
+
+$('formLogin').onsubmit = async ev => {
+  ev.preventDefault();
+  $('erroLogin').textContent = '';
+  const { error } = await db.auth.signInWithPassword({ email: $('email').value.trim(), password: $('senha').value });
+  if (error) $('erroLogin').textContent = 'E-mail ou senha incorretos.';
+};
+$('sair').onclick = async () => { await db.auth.signOut(); location.reload(); };
+db.auth.onAuthStateChange((_ev, sessao) => { if (sessao) carregar(sessao); else $('entrar').hidden = false; });
+</script>
+</body>
+</html>
