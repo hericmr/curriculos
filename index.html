@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0b6e69">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icone.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icone.svg">
@@ -98,12 +101,23 @@ input[type=search], select { width: 100%; min-width: 0; padding: 8px 10px; borde
 .leg span { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
 .leaflet-control-zoom a { background: var(--sup) !important; color: var(--fg) !important; border-color: var(--borda) !important; }
 #alternar { display: none; }
+#telaCheia { display: none; }
 @media (max-width: 760px) {
-  #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  #painel { border-right: 0; border-bottom: 1px solid var(--borda); max-height: 45vh; }
+  /* celular: o mapa ocupa a tela inteira e a lista vira uma gaveta presa embaixo */
+  body { padding-top: 0; }
+  #app { display: block; height: 100dvh; }
+  #mapa { position: fixed; inset: 0; height: 100dvh; }
+  #painel { position: fixed; z-index: 900; left: 0; right: 0; bottom: 0; max-height: 72dvh; border: 0; border-top: 1px solid var(--borda);
+    border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgb(0 0 0 / .18); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  #painel .topo:first-child { padding-block: 10px 8px; gap: 6px; }
+  #painel .topo:first-child::before { content: ""; width: 36px; height: 4px; border-radius: 2px; background: var(--borda); justify-self: center; margin-bottom: 2px; }
+  h1 { font-size: 15px; }
   #painel.recolhido #corpo { display: none; }
-  #alternar { display: inline-block; }
-  #ficha { left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); width: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  #alternar, #telaCheia { display: inline-block; }
+  .quem { display: none; }
+  .leaflet-top { top: env(safe-area-inset-top, 0px); }
+  .leaflet-bottom { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+  #ficha { z-index: 1000; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); width: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (prefers-reduced-motion: no-preference) { .btn, .chip { transition: background .15s; } }
 </style>
@@ -121,7 +135,8 @@ input[type=search], select { width: 100%; min-width: 0; padding: 8px 10px; borde
   <aside id="painel">
     <div class="topo">
       <div class="linha"><h1>Entrega de currículos</h1><span class="quem" id="quem"></span><button class="btn" id="sair" hidden>Sair</button>
-        <button class="btn" id="alternar" aria-expanded="true" aria-controls="corpo">Lista</button></div>
+        <button class="btn" id="telaCheia" aria-label="Tela cheia">⛶</button>
+        <button class="btn pri" id="alternar" aria-expanded="true" aria-controls="corpo">Mapa</button></div>
       <div class="prog"><span id="progTxt">Carregando…</span><span id="progSub"></span></div>
       <div class="barra" aria-hidden="true"><i id="bOk" style="background:var(--ok)"></i><i id="bVolta" style="background:var(--volta)"></i><i id="bNao" style="background:var(--nao)"></i></div>
     </div>
@@ -342,7 +357,19 @@ $('busca').oninput = () => render();
 $('cidade').onchange = () => { bairroAberto = null; render(); };
 for (const [btn, k] of [['fPend', 'pend'], ['fMeus', 'meus'], ['fLivres', 'livres']])
   $(btn).onclick = () => { filtro[k] = !filtro[k]; $(btn).setAttribute('aria-pressed', filtro[k]); render(); };
-$('alternar').onclick = () => { const p = $('painel'); p.classList.toggle('recolhido'); $('alternar').setAttribute('aria-expanded', !p.classList.contains('recolhido')); setTimeout(() => mapa.invalidateSize(), 50); };
+$('alternar').onclick = () => {
+  const p = $('painel'), fechado = p.classList.toggle('recolhido');
+  $('alternar').setAttribute('aria-expanded', !fechado);
+  $('alternar').textContent = fechado ? 'Bairros' : 'Mapa';
+  setTimeout(() => mapa.invalidateSize(), 50);
+};
+// no celular abre com o mapa à mostra e a lista recolhida
+if (matchMedia('(max-width: 760px)').matches) $('alternar').click();
+// tela cheia: funciona no Android; no iPhone use "Adicionar à Tela de Início"
+const raiz = document.documentElement;
+if (!raiz.requestFullscreen) $('telaCheia').remove();
+else $('telaCheia').onclick = () => document.fullscreenElement ? document.exitFullscreen() : raiz.requestFullscreen().catch(() => {});
+document.addEventListener('fullscreenchange', () => setTimeout(() => mapa.invalidateSize(), 100));
 
 // login e dados compartilhados (Supabase)
 db = supabase.createClient(window.CONFIG.supabaseUrl, window.CONFIG.supabaseAnonKey);
